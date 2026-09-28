@@ -212,6 +212,16 @@
   .srcinfo b { font-weight: 600; }
   .srcinfo span { color: var(--muted); }
 
+  /* ---- Tách nhanh — ngay trong trình duyệt, không cần chờ máy chủ ----- */
+  #lvVideo {
+    display: none;
+    width: 100%;
+    border-radius: 10px;
+    margin-top: 14px;
+    background: #000;
+  }
+  #lvMixer { display: none; margin-top: 22px; }
+
   /* ---- Progress ------------------------------------------------------ */
   #progress { margin-top: 28px; display: none; }
   .bar {
@@ -461,6 +471,41 @@
   <p class="eyebrow">Tách nguồn âm thanh</p>
   <h1>Tách <em>giọng</em> khỏi <em>nhạc</em> trong một bước.</h1>
   <p class="lede">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
+
+  <p class="eyebrow">Tách nhanh — ngay trong trình duyệt</p>
+  <div class="card" id="liveCard">
+    <p class="lede" style="margin-bottom:20px; max-width: none;">
+      Không cần tải lên, không cần chờ: thả file nhạc hoặc video vào đây, bấm
+      <b>Giọng</b> hoặc <b>Beat</b> để nghe riêng từng phần, kéo fader để chỉnh
+      âm lượng ngay trong lúc đang phát. Dùng mẹo triệt pha giữa hai kênh
+      trái/phải nên chỉ tách được với file <b>stereo</b> có giọng nằm giữa —
+      không sạch bằng mô hình AI ở dưới, nhưng ra kết quả tức thì. File mono
+      hoặc bản đã gộp chung một kênh sẽ không tách được gì.
+    </p>
+
+    <div class="drop" id="lvDrop">
+      Kéo thả file nhạc hoặc video vào đây, hoặc chọn từ máy
+      <input type="file" id="lvFile" accept="audio/*,video/*">
+      <div class="picked" id="lvPicked"></div>
+    </div>
+
+    <video id="lvVideo" playsinline></video>
+
+    <div class="err" id="lvErr"></div>
+
+    <div id="lvMixer">
+      <div class="transport">
+        <button class="playbtn" id="lvPlay" aria-label="Phát">▶</button>
+        <div class="scrub">
+          <input type="range" id="lvSeek" min="0" max="1000" value="0" aria-label="Vị trí phát">
+          <div class="time"><span id="lvTNow">0:00</span><span id="lvTEnd">0:00</span></div>
+        </div>
+      </div>
+      <div id="lvStrips"></div>
+    </div>
+  </div>
+
+  <div class="orbar"><span>hoặc tách chất lượng cao bằng AI</span></div>
 
   <div class="banner" id="banner"></div>
 
@@ -764,6 +809,223 @@ $("seek").oninput = (e) => {
   $("tNow").textContent = fmt(offset);
   if (wasPlaying) play();
 };
+
+// ---- Tách nhanh trong trình duyệt (mẹo triệt pha, không qua máy chủ) -----
+// Mid = (L+R)/2 giữ phần nằm giữa hai kênh (thường là giọng hát).
+// Side = (L-R)/2 giữ phần lệch kênh (thường là nhạc nền, trống, bass).
+// Cộng cả hai lại đúng 100% ra lại bản gốc — không mất tiếng, không lệch pha.
+let lvCtx, lvSource, lvTracks = [], lvNodes = [], lvObjectUrl = null, lvRaf;
+
+function lvFmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function lvApplyGains() {
+  const soloed = lvTracks.some(t => t.solo);
+  lvTracks.forEach(t => {
+    const audible = t.mute ? 0 : (soloed && !t.solo ? 0 : t.volume);
+    t.gain.gain.setTargetAtTime(audible, lvCtx.currentTime, 0.01);
+    t.el.classList.toggle("dim", audible === 0);
+  });
+}
+
+function lvBuildStrips() {
+  const box = $("lvStrips");
+  box.innerHTML = "";
+  const defs = [
+    { key: "vocals", label: "Giọng hát", color: "var(--vocals)" },
+    { key: "beat", label: "Nhạc nền (beat)", color: "var(--instrumental)" }
+  ];
+  lvTracks = defs.map(d => {
+    const el = document.createElement("div");
+    el.className = "strip";
+    el.style.setProperty("--c", d.color);
+    el.innerHTML = `
+      <div class="strip-head">
+        <span class="strip-name">${d.label}</span>
+        <button class="tog" aria-pressed="false" title="Tắt tiếng">M</button>
+        <button class="tog" aria-pressed="false" title="Chỉ nghe phần này">S</button>
+      </div>
+      <div class="fader">
+        <input type="range" min="0" max="100" value="100" aria-label="Âm lượng ${d.label}">
+        <div class="meter"><i></i></div>
+      </div>`;
+    box.appendChild(el);
+
+    const gain = lvCtx.createGain();
+    const analyser = lvCtx.createAnalyser();
+    analyser.fftSize = 512;
+    gain.connect(analyser);
+    analyser.connect(lvCtx.destination);
+    lvNodes.push(gain, analyser);
+
+    const t = {
+      key: d.key, el, gain, analyser,
+      buf: new Uint8Array(analyser.fftSize),
+      meterFill: el.querySelector(".meter > i"),
+      volume: 1, mute: false, solo: false
+    };
+    const [mBtn, sBtn] = el.querySelectorAll(".tog");
+    mBtn.onclick = () => { t.mute = !t.mute; mBtn.setAttribute("aria-pressed", t.mute); lvApplyGains(); };
+    sBtn.onclick = () => { t.solo = !t.solo; sBtn.setAttribute("aria-pressed", t.solo); lvApplyGains(); };
+    el.querySelector(".fader input").oninput = (e) => { t.volume = e.target.value / 100; lvApplyGains(); };
+    return t;
+  });
+}
+
+function lvBuildGraph() {
+  const splitter = lvCtx.createChannelSplitter(2);
+  lvSource.connect(splitter);
+
+  const invR = lvCtx.createGain(); invR.gain.value = -1;
+  splitter.connect(invR, 1);
+
+  const mid = lvCtx.createGain(); mid.gain.value = 0.5;   // (L+R)/2
+  splitter.connect(mid, 0);
+  splitter.connect(mid, 1);
+
+  const side = lvCtx.createGain(); side.gain.value = 0.5; // (L-R)/2
+  splitter.connect(side, 0);
+  invR.connect(side);
+
+  const sideInv = lvCtx.createGain(); sideInv.gain.value = -1;
+  side.connect(sideInv);
+
+  const vocalMerge = lvCtx.createChannelMerger(2);
+  mid.connect(vocalMerge, 0, 0);
+  mid.connect(vocalMerge, 0, 1);
+
+  const beatMerge = lvCtx.createChannelMerger(2);
+  side.connect(beatMerge, 0, 0);
+  sideInv.connect(beatMerge, 0, 1);
+
+  lvNodes.push(splitter, invR, mid, side, sideInv, vocalMerge, beatMerge);
+
+  const vocals = lvTracks.find(t => t.key === "vocals");
+  const beat = lvTracks.find(t => t.key === "beat");
+  vocalMerge.connect(vocals.gain);
+  beatMerge.connect(beat.gain);
+}
+
+function lvTeardownGraph() {
+  if (lvSource) { try { lvSource.disconnect(); } catch (e) {} }
+  lvNodes.forEach(n => { try { n.disconnect(); } catch (e) {} });
+  lvNodes = [];
+}
+
+function lvDrawMeters() {
+  lvTracks.forEach(t => {
+    t.analyser.getByteTimeDomainData(t.buf);
+    let peak = 0;
+    for (let i = 0; i < t.buf.length; i += 4) {
+      const v = Math.abs(t.buf[i] - 128) / 128;
+      if (v > peak) peak = v;
+    }
+    t.meterFill.style.width = (Math.min(1, peak * 1.6) * 100) + "%";
+  });
+  lvRaf = requestAnimationFrame(lvDrawMeters);
+}
+function lvStopMeters() {
+  cancelAnimationFrame(lvRaf);
+  lvTracks.forEach(t => { t.meterFill.style.width = "0%"; });
+}
+
+function lvInitMediaEvents() {
+  const media = $("lvVideo");
+  media.addEventListener("play", () => {
+    $("lvPlay").textContent = "❚❚";
+    $("lvPlay").setAttribute("aria-label", "Tạm dừng");
+    lvDrawMeters();
+  });
+  media.addEventListener("pause", () => {
+    $("lvPlay").textContent = "▶";
+    $("lvPlay").setAttribute("aria-label", "Phát");
+    lvStopMeters();
+  });
+  media.addEventListener("ended", () => {
+    $("lvPlay").textContent = "▶";
+    lvStopMeters();
+  });
+  media.addEventListener("timeupdate", () => {
+    if (!media.duration) return;
+    $("lvSeek").value = Math.round((media.currentTime / media.duration) * 1000);
+    $("lvTNow").textContent = lvFmt(media.currentTime);
+  });
+}
+
+async function lvLoadFile(file) {
+  $("lvErr").textContent = "";
+  $("lvMixer").style.display = "none";
+  $("lvPicked").textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
+
+  const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name);
+  if (lvObjectUrl) URL.revokeObjectURL(lvObjectUrl);
+  lvObjectUrl = URL.createObjectURL(file);
+
+  // Dùng chung một thẻ <video> cho cả audio lẫn video: tiếng của <video> vẫn
+  // phát đầy đủ dù ẩn khung hình, nên không cần thêm thẻ <audio> riêng —
+  // MediaElementSource chỉ tạo được đúng một lần cho mỗi thẻ media.
+  const media = $("lvVideo");
+  media.style.display = isVideo ? "block" : "none";
+  media.muted = false;
+  media.volume = 1;
+  media.src = lvObjectUrl;
+  media.load();
+
+  lvCtx = lvCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (lvCtx.state === "suspended") await lvCtx.resume();
+  if (!lvSource) lvSource = lvCtx.createMediaElementSource(media);
+
+  lvTeardownGraph();
+  lvBuildStrips();
+  lvBuildGraph();
+
+  await new Promise((resolve, reject) => {
+    media.onloadedmetadata = resolve;
+    media.onerror = () => reject(new Error("Không đọc được file này — thử định dạng khác."));
+  });
+
+  $("lvTEnd").textContent = lvFmt(media.duration);
+  $("lvTNow").textContent = "0:00";
+  $("lvSeek").value = 0;
+  $("lvMixer").style.display = "block";
+  $("lvMixer").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+lvInitMediaEvents();
+
+$("lvPlay").onclick = () => {
+  const media = $("lvVideo");
+  if (!media.src) return;
+  if (lvCtx.state === "suspended") lvCtx.resume();
+  media.paused ? media.play() : media.pause();
+};
+$("lvSeek").oninput = (e) => {
+  const media = $("lvVideo");
+  if (!media.duration) return;
+  media.currentTime = (e.target.value / 1000) * media.duration;
+};
+
+$("lvFile").onchange = () => {
+  const f = $("lvFile").files[0];
+  if (f) lvLoadFile(f).catch(e => { $("lvErr").textContent = e.message; });
+};
+
+const lvDrop = $("lvDrop");
+["dragenter", "dragover"].forEach(ev => lvDrop.addEventListener(ev, (e) => {
+  e.preventDefault();
+  lvDrop.classList.add("over");
+}));
+["dragleave", "drop"].forEach(ev => lvDrop.addEventListener(ev, (e) => {
+  e.preventDefault();
+  lvDrop.classList.remove("over");
+}));
+lvDrop.addEventListener("drop", (e) => {
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!f) return;
+  lvLoadFile(f).catch(err => { $("lvErr").textContent = err.message; });
+});
 
 // ---- Kiểm tra backend ----------------------------------------------------
 function showBanner(html) {
