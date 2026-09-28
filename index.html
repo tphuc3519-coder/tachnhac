@@ -222,6 +222,55 @@
   }
   #lvMixer { display: none; margin-top: 22px; }
 
+  .livestrip { margin-bottom: 22px; }
+  .livestrip-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 9px;
+  }
+  .livestrip-name { font-weight: 800; font-size: 15px; color: var(--c); }
+  .livestrip-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 3.5em;
+    text-align: right;
+  }
+  /* Thanh kéo tô màu tới đúng vị trí đang kéo — JS cập nhật background theo % */
+  .livestrip input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--line);
+    outline: none;
+  }
+  .livestrip input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--ivory);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    cursor: pointer;
+    margin-top: 0;
+  }
+  .livestrip input[type=range]::-moz-range-thumb {
+    width: 26px; height: 26px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ivory);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+  .livestrip input[type=range]::-moz-range-track {
+    height: 14px;
+    border-radius: 7px;
+    background: transparent;
+  }
+
   /* ---- Progress ------------------------------------------------------ */
   #progress { margin-top: 28px; display: none; }
   .bar {
@@ -494,6 +543,7 @@
     <div class="err" id="lvErr"></div>
 
     <div id="lvMixer">
+      <div id="lvStrips"></div>
       <div class="transport">
         <button class="playbtn" id="lvPlay" aria-label="Phát">▶</button>
         <div class="scrub">
@@ -501,7 +551,6 @@
           <div class="time"><span id="lvTNow">0:00</span><span id="lvTEnd">0:00</span></div>
         </div>
       </div>
-      <div id="lvStrips"></div>
     </div>
   </div>
 
@@ -814,62 +863,55 @@ $("seek").oninput = (e) => {
 // Mid = (L+R)/2 giữ phần nằm giữa hai kênh (thường là giọng hát).
 // Side = (L-R)/2 giữ phần lệch kênh (thường là nhạc nền, trống, bass).
 // Cộng cả hai lại đúng 100% ra lại bản gốc — không mất tiếng, không lệch pha.
-let lvCtx, lvSource, lvTracks = [], lvNodes = [], lvObjectUrl = null, lvRaf;
+let lvCtx, lvSource, lvTracks = [], lvNodes = [], lvObjectUrl = null;
 
 function lvFmt(s) {
   s = Math.max(0, Math.floor(s || 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function lvApplyGains() {
-  const soloed = lvTracks.some(t => t.solo);
-  lvTracks.forEach(t => {
-    const audible = t.mute ? 0 : (soloed && !t.solo ? 0 : t.volume);
-    t.gain.gain.setTargetAtTime(audible, lvCtx.currentTime, 0.01);
-    t.el.classList.toggle("dim", audible === 0);
-  });
+// Tô màu thanh kéo tới đúng % đang kéo — làm tại chỗ, không cần ảnh hay thư viện.
+function lvPaintSlider(input, pct, color) {
+  input.style.background =
+    `linear-gradient(to right, ${color} ${pct}%, var(--line) ${pct}%)`;
+}
+
+function lvSetVolume(t, pct) {
+  t.volume = pct / 100;
+  t.gain.gain.setTargetAtTime(t.volume, lvCtx.currentTime, 0.01);
+  t.pctEl.textContent = pct + "%";
+  lvPaintSlider(t.input, pct, t.color);
 }
 
 function lvBuildStrips() {
   const box = $("lvStrips");
   box.innerHTML = "";
   const defs = [
-    { key: "vocals", label: "Giọng hát", color: "var(--vocals)" },
-    { key: "beat", label: "Nhạc nền (beat)", color: "var(--instrumental)" }
+    { key: "beat", label: "Nhạc nền", color: "var(--instrumental)" },
+    { key: "vocals", label: "Giọng hát", color: "var(--vocals)" }
   ];
   lvTracks = defs.map(d => {
     const el = document.createElement("div");
-    el.className = "strip";
+    el.className = "livestrip";
     el.style.setProperty("--c", d.color);
     el.innerHTML = `
-      <div class="strip-head">
-        <span class="strip-name">${d.label}</span>
-        <button class="tog" aria-pressed="false" title="Tắt tiếng">M</button>
-        <button class="tog" aria-pressed="false" title="Chỉ nghe phần này">S</button>
+      <div class="livestrip-head">
+        <span class="livestrip-name">${d.label}</span>
+        <span class="livestrip-pct">100%</span>
       </div>
-      <div class="fader">
-        <input type="range" min="0" max="100" value="100" aria-label="Âm lượng ${d.label}">
-        <div class="meter"><i></i></div>
-      </div>`;
+      <input type="range" min="0" max="100" value="100" aria-label="Âm lượng ${d.label}">`;
     box.appendChild(el);
 
     const gain = lvCtx.createGain();
-    const analyser = lvCtx.createAnalyser();
-    analyser.fftSize = 512;
-    gain.connect(analyser);
-    analyser.connect(lvCtx.destination);
-    lvNodes.push(gain, analyser);
+    lvNodes.push(gain);
 
     const t = {
-      key: d.key, el, gain, analyser,
-      buf: new Uint8Array(analyser.fftSize),
-      meterFill: el.querySelector(".meter > i"),
-      volume: 1, mute: false, solo: false
+      key: d.key, el, gain, color: d.color, volume: 1,
+      pctEl: el.querySelector(".livestrip-pct"),
+      input: el.querySelector("input")
     };
-    const [mBtn, sBtn] = el.querySelectorAll(".tog");
-    mBtn.onclick = () => { t.mute = !t.mute; mBtn.setAttribute("aria-pressed", t.mute); lvApplyGains(); };
-    sBtn.onclick = () => { t.solo = !t.solo; sBtn.setAttribute("aria-pressed", t.solo); lvApplyGains(); };
-    el.querySelector(".fader input").oninput = (e) => { t.volume = e.target.value / 100; lvApplyGains(); };
+    t.input.oninput = (e) => lvSetVolume(t, Number(e.target.value));
+    lvPaintSlider(t.input, 100, d.color);
     return t;
   });
 }
@@ -906,6 +948,8 @@ function lvBuildGraph() {
   const beat = lvTracks.find(t => t.key === "beat");
   vocalMerge.connect(vocals.gain);
   beatMerge.connect(beat.gain);
+  vocals.gain.connect(lvCtx.destination);
+  beat.gain.connect(lvCtx.destination);
 }
 
 function lvTeardownGraph() {
@@ -914,38 +958,18 @@ function lvTeardownGraph() {
   lvNodes = [];
 }
 
-function lvDrawMeters() {
-  lvTracks.forEach(t => {
-    t.analyser.getByteTimeDomainData(t.buf);
-    let peak = 0;
-    for (let i = 0; i < t.buf.length; i += 4) {
-      const v = Math.abs(t.buf[i] - 128) / 128;
-      if (v > peak) peak = v;
-    }
-    t.meterFill.style.width = (Math.min(1, peak * 1.6) * 100) + "%";
-  });
-  lvRaf = requestAnimationFrame(lvDrawMeters);
-}
-function lvStopMeters() {
-  cancelAnimationFrame(lvRaf);
-  lvTracks.forEach(t => { t.meterFill.style.width = "0%"; });
-}
-
 function lvInitMediaEvents() {
   const media = $("lvVideo");
   media.addEventListener("play", () => {
     $("lvPlay").textContent = "❚❚";
     $("lvPlay").setAttribute("aria-label", "Tạm dừng");
-    lvDrawMeters();
   });
   media.addEventListener("pause", () => {
     $("lvPlay").textContent = "▶";
     $("lvPlay").setAttribute("aria-label", "Phát");
-    lvStopMeters();
   });
   media.addEventListener("ended", () => {
     $("lvPlay").textContent = "▶";
-    lvStopMeters();
   });
   media.addEventListener("timeupdate", () => {
     if (!media.duration) return;
