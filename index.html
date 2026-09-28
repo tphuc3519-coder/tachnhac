@@ -551,6 +551,7 @@
           <div class="time"><span id="lvTNow">0:00</span><span id="lvTEnd">0:00</span></div>
         </div>
       </div>
+      <button class="primary" id="lvDownload" type="button">Tải bản đã chỉnh (.wav)</button>
     </div>
   </div>
 
@@ -864,6 +865,7 @@ $("seek").oninput = (e) => {
 // Side = (L-R)/2 giữ phần lệch kênh (thường là nhạc nền, trống, bass).
 // Cộng cả hai lại đúng 100% ra lại bản gốc — không mất tiếng, không lệch pha.
 let lvCtx, lvSource, lvTracks = [], lvNodes = [], lvObjectUrl = null;
+let lvFileBytes = null, lvFileBaseName = "";
 
 function lvFmt(s) {
   s = Math.max(0, Math.floor(s || 0));
@@ -916,40 +918,127 @@ function lvBuildStrips() {
   });
 }
 
-function lvBuildGraph() {
-  const splitter = lvCtx.createChannelSplitter(2);
-  lvSource.connect(splitter);
+// Dùng chung cho cả đồ thị nghe trực tiếp lẫn lúc render file để tải về —
+// cùng một công thức tách pha, chỉ khác AudioContext (live hay offline).
+function lvWireSplit(actx, source, vocalOut, beatOut) {
+  const splitter = actx.createChannelSplitter(2);
+  source.connect(splitter);
 
-  const invR = lvCtx.createGain(); invR.gain.value = -1;
+  const invR = actx.createGain(); invR.gain.value = -1;
   splitter.connect(invR, 1);
 
-  const mid = lvCtx.createGain(); mid.gain.value = 0.5;   // (L+R)/2
+  const mid = actx.createGain(); mid.gain.value = 0.5;   // (L+R)/2
   splitter.connect(mid, 0);
   splitter.connect(mid, 1);
 
-  const side = lvCtx.createGain(); side.gain.value = 0.5; // (L-R)/2
+  const side = actx.createGain(); side.gain.value = 0.5; // (L-R)/2
   splitter.connect(side, 0);
   invR.connect(side);
 
-  const sideInv = lvCtx.createGain(); sideInv.gain.value = -1;
+  const sideInv = actx.createGain(); sideInv.gain.value = -1;
   side.connect(sideInv);
 
-  const vocalMerge = lvCtx.createChannelMerger(2);
+  const vocalMerge = actx.createChannelMerger(2);
   mid.connect(vocalMerge, 0, 0);
   mid.connect(vocalMerge, 0, 1);
+  vocalMerge.connect(vocalOut);
 
-  const beatMerge = lvCtx.createChannelMerger(2);
+  const beatMerge = actx.createChannelMerger(2);
   side.connect(beatMerge, 0, 0);
   sideInv.connect(beatMerge, 0, 1);
+  beatMerge.connect(beatOut);
 
-  lvNodes.push(splitter, invR, mid, side, sideInv, vocalMerge, beatMerge);
+  return [splitter, invR, mid, side, sideInv, vocalMerge, beatMerge];
+}
 
+function lvBuildGraph() {
   const vocals = lvTracks.find(t => t.key === "vocals");
   const beat = lvTracks.find(t => t.key === "beat");
-  vocalMerge.connect(vocals.gain);
-  beatMerge.connect(beat.gain);
+  lvNodes.push(...lvWireSplit(lvCtx, lvSource, vocals.gain, beat.gain));
   vocals.gain.connect(lvCtx.destination);
   beat.gain.connect(lvCtx.destination);
+}
+
+function lvAudioBufferToWav(buffer) {
+  const numCh = buffer.numberOfChannels;
+  const sr = buffer.sampleRate;
+  const len = buffer.length;
+  const blockAlign = numCh * 2;
+  const dataSize = len * blockAlign;
+  const out = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(out);
+  const writeStr = (offset, s) => { for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i)); };
+
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  const chans = [];
+  for (let c = 0; c < numCh; c++) chans.push(buffer.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < numCh; c++) {
+      const s = Math.max(-1, Math.min(1, chans[c][i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      off += 2;
+    }
+  }
+  return new Blob([out], { type: "audio/wav" });
+}
+
+// Kết xuất đúng bản đang nghe — theo đúng % Giọng hát/Nhạc nền đang kéo —
+// thành file WAV rồi tải về. Giải mã lại từ bytes gốc, không đụng tới ctx
+// đang phát để khỏi làm gián đoạn nhạc đang chạy.
+async function lvRenderAndDownload() {
+  if (!lvFileBytes) return;
+  const btn = $("lvDownload");
+  const oldLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Đang tạo file…";
+  try {
+    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = await tmpCtx.decodeAudioData(lvFileBytes.slice(0));
+    tmpCtx.close();
+
+    const off = new OfflineAudioContext(2, Math.ceil(buf.duration * buf.sampleRate), buf.sampleRate);
+    const src = off.createBufferSource();
+    src.buffer = buf;
+
+    const vocalGain = off.createGain();
+    vocalGain.gain.value = lvTracks.find(t => t.key === "vocals").volume;
+    const beatGain = off.createGain();
+    beatGain.gain.value = lvTracks.find(t => t.key === "beat").volume;
+    lvWireSplit(off, src, vocalGain, beatGain);
+    vocalGain.connect(off.destination);
+    beatGain.connect(off.destination);
+
+    src.start(0);
+    const rendered = await off.startRendering();
+    const blob = lvAudioBufferToWav(rendered);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (lvFileBaseName || "tach-nhanh") + ".wav";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {
+    $("lvErr").textContent = "Không tạo được file để tải: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldLabel;
+  }
 }
 
 function lvTeardownGraph() {
@@ -986,6 +1075,8 @@ async function lvLoadFile(file) {
   const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name);
   if (lvObjectUrl) URL.revokeObjectURL(lvObjectUrl);
   lvObjectUrl = URL.createObjectURL(file);
+  lvFileBytes = await file.arrayBuffer();
+  lvFileBaseName = file.name.replace(/\.[^.]+$/, "");
 
   // Dùng chung một thẻ <video> cho cả audio lẫn video: tiếng của <video> vẫn
   // phát đầy đủ dù ẩn khung hình, nên không cần thêm thẻ <audio> riêng —
@@ -1030,6 +1121,8 @@ $("lvSeek").oninput = (e) => {
   if (!media.duration) return;
   media.currentTime = (e.target.value / 1000) * media.duration;
 };
+
+$("lvDownload").onclick = () => { lvRenderAndDownload(); };
 
 $("lvFile").onchange = () => {
   const f = $("lvFile").files[0];
