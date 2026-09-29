@@ -217,11 +217,31 @@
   #lvVideo {
     display: none;
     width: 100%;
+    height: min(52vh, 380px);
+    object-fit: contain;
     border-radius: 10px;
     margin-top: 14px;
     background: #000;
   }
   #lvMixer { display: none; margin-top: 22px; }
+
+  #lvLoading {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    flex: 0 0 16px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    border-top-color: var(--instrumental);
+    animation: lvspin 0.7s linear infinite;
+  }
+  @keyframes lvspin { to { transform: rotate(360deg); } }
 
   .livestrip { margin-bottom: 22px; }
   .livestrip-head {
@@ -270,6 +290,19 @@
     height: 14px;
     border-radius: 7px;
     background: transparent;
+  }
+
+  /* Xem/nghe lại file gốc trong lúc chờ máy chủ tách — đỡ nhìn thanh
+     progress trống trơn. Chỉ có với Cách 1 (thả file), vì Cách 2 (link)
+     chưa có file nào ở máy để phát. */
+  #previewVideo {
+    display: none;
+    width: 100%;
+    height: min(52vh, 380px);
+    object-fit: contain;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    background: #000;
   }
 
   /* ---- Progress ------------------------------------------------------ */
@@ -510,7 +543,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
+    * { transition: none !important; animation: none !important; }
   }
   :focus-visible { outline: 2px solid var(--instrumental); outline-offset: 2px; }
 </style>
@@ -541,6 +574,7 @@
 
     <video id="lvVideo" playsinline></video>
 
+    <div id="lvLoading"><span class="spinner"></span>Đang nạp file…</div>
     <div class="err" id="lvErr"></div>
 
     <div id="lvMixer">
@@ -564,9 +598,9 @@
     <div class="row">
       <label class="field" for="model">Kiểu tách</label>
       <select id="model">
-        <option value="roformer">Giọng + Nhạc nền — chất lượng cao nhất</option>
-        <option value="htdemucs_ft">4 track: giọng, trống, bass, nhạc cụ</option>
-        <option value="htdemucs">4 track — nhanh hơn, hơi kém sạch</option>
+        <option value="htdemucs">4 track: giọng, trống, bass, nhạc cụ — nhanh nhất</option>
+        <option value="roformer">Giọng + Nhạc nền — tách kĩ, chất lượng cao nhất</option>
+        <option value="htdemucs_ft">4 track — tách kĩ hơn, chậm hơn ~4x</option>
       </select>
     </div>
 
@@ -621,6 +655,7 @@
   </div>
 
   <div id="progress">
+    <video id="previewVideo" controls playsinline></video>
     <div class="status" id="statusText">Đang tải lên…</div>
     <div class="bar"><i id="barFill"></i></div>
     <div class="srcinfo" id="srcInfo"></div>
@@ -689,6 +724,24 @@ const colorOf = (n) => COLORS[String(n).toLowerCase()] || "var(--other)";
 
 // ---- Audio engine --------------------------------------------------------
 let ctx, tracks = [], duration = 0, playing = false, startedAt = 0, offset = 0, raf;
+let previewObjectUrl = null;
+
+function showPreview(file) {
+  const media = $("previewVideo");
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+  previewObjectUrl = URL.createObjectURL(file);
+  media.src = previewObjectUrl;
+  media.style.display = "block";
+}
+
+function hidePreview() {
+  const media = $("previewVideo");
+  media.pause();
+  media.removeAttribute("src");
+  media.load();
+  media.style.display = "none";
+  if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+}
 
 function fmt(s) {
   s = Math.max(0, Math.floor(s));
@@ -1071,42 +1124,48 @@ function lvInitMediaEvents() {
 async function lvLoadFile(file) {
   $("lvErr").textContent = "";
   $("lvMixer").style.display = "none";
+  $("lvVideo").style.display = "none";
   $("lvPicked").textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
+  $("lvLoading").style.display = "flex";
 
-  const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name);
-  if (lvObjectUrl) URL.revokeObjectURL(lvObjectUrl);
-  lvObjectUrl = URL.createObjectURL(file);
-  lvFileBytes = await file.arrayBuffer();
-  lvFileBaseName = file.name.replace(/\.[^.]+$/, "");
+  try {
+    const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name);
+    if (lvObjectUrl) URL.revokeObjectURL(lvObjectUrl);
+    lvObjectUrl = URL.createObjectURL(file);
+    lvFileBytes = await file.arrayBuffer();
+    lvFileBaseName = file.name.replace(/\.[^.]+$/, "");
 
-  // Dùng chung một thẻ <video> cho cả audio lẫn video: tiếng của <video> vẫn
-  // phát đầy đủ dù ẩn khung hình, nên không cần thêm thẻ <audio> riêng —
-  // MediaElementSource chỉ tạo được đúng một lần cho mỗi thẻ media.
-  const media = $("lvVideo");
-  media.style.display = isVideo ? "block" : "none";
-  media.muted = false;
-  media.volume = 1;
-  media.src = lvObjectUrl;
-  media.load();
+    // Dùng chung một thẻ <video> cho cả audio lẫn video: tiếng của <video> vẫn
+    // phát đầy đủ dù ẩn khung hình, nên không cần thêm thẻ <audio> riêng —
+    // MediaElementSource chỉ tạo được đúng một lần cho mỗi thẻ media.
+    const media = $("lvVideo");
+    media.muted = false;
+    media.volume = 1;
+    media.src = lvObjectUrl;
+    media.load();
 
-  lvCtx = lvCtx || new (window.AudioContext || window.webkitAudioContext)();
-  if (lvCtx.state === "suspended") await lvCtx.resume();
-  if (!lvSource) lvSource = lvCtx.createMediaElementSource(media);
+    lvCtx = lvCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (lvCtx.state === "suspended") await lvCtx.resume();
+    if (!lvSource) lvSource = lvCtx.createMediaElementSource(media);
 
-  lvTeardownGraph();
-  lvBuildStrips();
-  lvBuildGraph();
+    lvTeardownGraph();
+    lvBuildStrips();
+    lvBuildGraph();
 
-  await new Promise((resolve, reject) => {
-    media.onloadedmetadata = resolve;
-    media.onerror = () => reject(new Error("Không đọc được file này — thử định dạng khác."));
-  });
+    await new Promise((resolve, reject) => {
+      media.onloadedmetadata = resolve;
+      media.onerror = () => reject(new Error("Không đọc được file này — thử định dạng khác."));
+    });
 
-  $("lvTEnd").textContent = lvFmt(media.duration);
-  $("lvTNow").textContent = "0:00";
-  $("lvSeek").value = 0;
-  $("lvMixer").style.display = "block";
-  $("lvMixer").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    media.style.display = isVideo ? "block" : "none";
+    $("lvTEnd").textContent = lvFmt(media.duration);
+    $("lvTNow").textContent = "0:00";
+    $("lvSeek").value = 0;
+    $("lvMixer").style.display = "block";
+    $("lvMixer").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } finally {
+    $("lvLoading").style.display = "none";
+  }
 }
 
 lvInitMediaEvents();
@@ -1464,6 +1523,7 @@ async function finishJob(job_id, job) {
   $("statusText").textContent =
     `Xong trong ${job.seconds} giây${job.device ? " trên " + job.device : ""}` +
     " — nhấn phát để nghe thử";
+  hidePreview();
   await loadStems(job_id, job);
 }
 
@@ -1491,6 +1551,7 @@ async function startJob(kind) {
   $("mixer").style.display = "none";
   $("srcInfo").style.display = "none";
   if (playing) pause(false);
+  if (kind === "file") showPreview(file); else hidePreview();
   $("progress").style.display = "block";
   $("statusText").textContent = kind === "link" ? STEP.resolving : "Đang tải lên…";
   $("barFill").style.width = "6%";
