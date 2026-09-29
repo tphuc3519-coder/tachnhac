@@ -213,85 +213,6 @@
   .srcinfo b { font-weight: 600; }
   .srcinfo span { color: var(--muted); }
 
-  /* ---- Tách nhanh — ngay trong trình duyệt, không cần chờ máy chủ ----- */
-  #lvVideo {
-    display: none;
-    width: 100%;
-    height: min(52vh, 380px);
-    object-fit: contain;
-    border-radius: 10px;
-    margin-top: 14px;
-    background: #000;
-  }
-  #lvMixer { display: none; margin-top: 22px; }
-
-  #lvLoading {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    margin-top: 14px;
-    color: var(--muted);
-    font-size: 13px;
-  }
-  .spinner {
-    width: 16px; height: 16px;
-    flex: 0 0 16px;
-    border-radius: 50%;
-    border: 2px solid var(--line);
-    border-top-color: var(--instrumental);
-    animation: lvspin 0.7s linear infinite;
-  }
-  @keyframes lvspin { to { transform: rotate(360deg); } }
-
-  .livestrip { margin-bottom: 22px; }
-  .livestrip-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 9px;
-  }
-  .livestrip-name { font-weight: 800; font-size: 15px; color: var(--c); }
-  .livestrip-pct {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--muted);
-    min-width: 3.5em;
-    text-align: right;
-  }
-  /* Thanh kéo tô màu tới đúng vị trí đang kéo — JS cập nhật background theo % */
-  .livestrip input[type=range] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 14px;
-    border-radius: 7px;
-    background: var(--line);
-    outline: none;
-  }
-  .livestrip input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 26px; height: 26px;
-    border-radius: 50%;
-    background: var(--ivory);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    cursor: pointer;
-    margin-top: 0;
-  }
-  .livestrip input[type=range]::-moz-range-thumb {
-    width: 26px; height: 26px;
-    border: 0;
-    border-radius: 50%;
-    background: var(--ivory);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    cursor: pointer;
-  }
-  .livestrip input[type=range]::-moz-range-track {
-    height: 14px;
-    border-radius: 7px;
-    background: transparent;
-  }
-
   /* Xem/nghe lại file gốc trong lúc chờ máy chủ tách — đỡ nhìn thanh
      progress trống trơn. Chỉ có với Cách 1 (thả file), vì Cách 2 (link)
      chưa có file nào ở máy để phát. */
@@ -436,6 +357,14 @@
 
   .fader { display: flex; align-items: center; gap: 11px; }
   .fader input { flex: 1; accent-color: var(--c); }
+  .fader-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 3.2em;
+    text-align: right;
+  }
 
   /* live level meter — cho thấy stem nào đang thực sự phát ra tiếng */
   .meter {
@@ -555,15 +484,14 @@
   <h1>Tách <em>giọng</em> khỏi <em>nhạc</em> trong một bước.</h1>
   <p class="lede">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
 
-  <p class="eyebrow">Tách nhanh — ngay trong trình duyệt</p>
+  <p class="eyebrow">Tách nhanh — AI thật, không phải mẹo giả lập</p>
   <div class="card" id="liveCard">
     <p class="lede" style="margin-bottom:20px; max-width: none;">
-      Không cần tải lên, không cần chờ: thả file nhạc hoặc video vào đây, bấm
-      <b>Giọng</b> hoặc <b>Beat</b> để nghe riêng từng phần, kéo fader để chỉnh
-      âm lượng ngay trong lúc đang phát. Dùng mẹo triệt pha giữa hai kênh
-      trái/phải nên chỉ tách được với file <b>stereo</b> có giọng nằm giữa —
-      không sạch bằng mô hình AI ở dưới, nhưng ra kết quả tức thì. File mono
-      hoặc bản đã gộp chung một kênh sẽ không tách được gì.
+      Thả file nhạc hoặc video vào đây là chạy luôn — dùng đúng model AI nhanh
+      nhất (tách được <b>giọng, trống, bass, nhạc cụ khác</b> kể cả sáo), không
+      phải mẹo triệt pha nên tách sạch thật sự. Chờ khoảng 30-60 giây, có thể
+      xem lại video trong lúc chờ. Cần chọn model khác hoặc dán link thì dùng
+      phần bên dưới.
     </p>
 
     <div class="drop" id="lvDrop">
@@ -571,26 +499,9 @@
       <input type="file" id="lvFile" accept="audio/*,video/*">
       <div class="picked" id="lvPicked"></div>
     </div>
-
-    <video id="lvVideo" playsinline></video>
-
-    <div id="lvLoading"><span class="spinner"></span>Đang nạp file…</div>
-    <div class="err" id="lvErr"></div>
-
-    <div id="lvMixer">
-      <div id="lvStrips"></div>
-      <div class="transport">
-        <button class="playbtn" id="lvPlay" aria-label="Phát">▶</button>
-        <div class="scrub">
-          <input type="range" id="lvSeek" min="0" max="1000" value="0" aria-label="Vị trí phát">
-          <div class="time"><span id="lvTNow">0:00</span><span id="lvTEnd">0:00</span></div>
-        </div>
-      </div>
-      <button class="primary" id="lvDownload" type="button">Tải bản đã chỉnh (.wav)</button>
-    </div>
   </div>
 
-  <div class="orbar"><span>hoặc tách chất lượng cao bằng AI</span></div>
+  <div class="orbar"><span>hoặc tuỳ chỉnh model / dán link</span></div>
 
   <div class="banner" id="banner"></div>
 
@@ -837,6 +748,7 @@ function buildMixer(jobId, stems) {
       </div>
       <div class="fader">
         <input type="range" min="0" max="100" value="100">
+        <span class="fader-pct">100%</span>
         <div class="meter"><i></i></div>
       </div>`;
     el.querySelector(".strip-name").textContent = labelOf(name);
@@ -859,7 +771,12 @@ function buildMixer(jobId, stems) {
     const [mBtn, sBtn] = el.querySelectorAll(".tog");
     mBtn.onclick = () => { t.mute = !t.mute; mBtn.setAttribute("aria-pressed", t.mute); applyGains(); };
     sBtn.onclick = () => { t.solo = !t.solo; sBtn.setAttribute("aria-pressed", t.solo); applyGains(); };
-    el.querySelector(".fader input").oninput = (e) => { t.volume = e.target.value / 100; applyGains(); };
+    const pctEl = el.querySelector(".fader-pct");
+    el.querySelector(".fader input").oninput = (e) => {
+      t.volume = e.target.value / 100;
+      pctEl.textContent = e.target.value + "%";
+      applyGains();
+    };
 
     tracks.push(t);
   });
@@ -914,279 +831,23 @@ $("seek").oninput = (e) => {
   if (wasPlaying) play();
 };
 
-// ---- Tách nhanh trong trình duyệt (mẹo triệt pha, không qua máy chủ) -----
-// Mid = (L+R)/2 giữ phần nằm giữa hai kênh (thường là giọng hát).
-// Side = (L-R)/2 giữ phần lệch kênh (thường là nhạc nền, trống, bass).
-// Cộng cả hai lại đúng 100% ra lại bản gốc — không mất tiếng, không lệch pha.
-let lvCtx, lvSource, lvTracks = [], lvNodes = [], lvObjectUrl = null;
-let lvFileBytes = null, lvFileBaseName = "";
-
-function lvFmt(s) {
-  s = Math.max(0, Math.floor(s || 0));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+// ---- Ô "Tách nhanh" ở đầu trang: chỉ là lối tắt --------------------------
+// Không tự xử lý gì cả — nhét file vào đúng input của Cách 1, ép model nhanh
+// nhất rồi gọi thẳng startJob, để dùng chung một đường xử lý (upload, poll,
+// mixer) với phần bên dưới thay vì viết riêng một bộ máy khác.
+function lvForwardToJob(file) {
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  $("file").files = dt.files;
+  showPicked();
+  $("model").value = "htdemucs";
+  $("err").textContent = "";
+  startJob("file");
 }
-
-// Tô màu thanh kéo tới đúng % đang kéo — làm tại chỗ, không cần ảnh hay thư viện.
-function lvPaintSlider(input, pct, color) {
-  input.style.background =
-    `linear-gradient(to right, ${color} ${pct}%, var(--line) ${pct}%)`;
-}
-
-function lvSetVolume(t, pct) {
-  t.volume = pct / 100;
-  t.gain.gain.setTargetAtTime(t.volume, lvCtx.currentTime, 0.01);
-  t.pctEl.textContent = pct + "%";
-  lvPaintSlider(t.input, pct, t.color);
-}
-
-function lvBuildStrips() {
-  const box = $("lvStrips");
-  box.innerHTML = "";
-  const defs = [
-    { key: "beat", label: "Nhạc nền", color: "var(--instrumental)" },
-    { key: "vocals", label: "Giọng hát", color: "var(--vocals)" }
-  ];
-  lvTracks = defs.map(d => {
-    const el = document.createElement("div");
-    el.className = "livestrip";
-    el.style.setProperty("--c", d.color);
-    el.innerHTML = `
-      <div class="livestrip-head">
-        <span class="livestrip-name">${d.label}</span>
-        <span class="livestrip-pct">100%</span>
-      </div>
-      <input type="range" min="0" max="100" value="100" aria-label="Âm lượng ${d.label}">`;
-    box.appendChild(el);
-
-    const gain = lvCtx.createGain();
-    lvNodes.push(gain);
-
-    const t = {
-      key: d.key, el, gain, color: d.color, volume: 1,
-      pctEl: el.querySelector(".livestrip-pct"),
-      input: el.querySelector("input")
-    };
-    t.input.oninput = (e) => lvSetVolume(t, Number(e.target.value));
-    lvPaintSlider(t.input, 100, d.color);
-    return t;
-  });
-}
-
-// Dùng chung cho cả đồ thị nghe trực tiếp lẫn lúc render file để tải về —
-// cùng một công thức tách pha, chỉ khác AudioContext (live hay offline).
-function lvWireSplit(actx, source, vocalOut, beatOut) {
-  const splitter = actx.createChannelSplitter(2);
-  source.connect(splitter);
-
-  const invR = actx.createGain(); invR.gain.value = -1;
-  splitter.connect(invR, 1);
-
-  const mid = actx.createGain(); mid.gain.value = 0.5;   // (L+R)/2
-  splitter.connect(mid, 0);
-  splitter.connect(mid, 1);
-
-  const side = actx.createGain(); side.gain.value = 0.5; // (L-R)/2
-  splitter.connect(side, 0);
-  invR.connect(side);
-
-  const sideInv = actx.createGain(); sideInv.gain.value = -1;
-  side.connect(sideInv);
-
-  const vocalMerge = actx.createChannelMerger(2);
-  mid.connect(vocalMerge, 0, 0);
-  mid.connect(vocalMerge, 0, 1);
-  vocalMerge.connect(vocalOut);
-
-  const beatMerge = actx.createChannelMerger(2);
-  side.connect(beatMerge, 0, 0);
-  sideInv.connect(beatMerge, 0, 1);
-  beatMerge.connect(beatOut);
-
-  return [splitter, invR, mid, side, sideInv, vocalMerge, beatMerge];
-}
-
-function lvBuildGraph() {
-  const vocals = lvTracks.find(t => t.key === "vocals");
-  const beat = lvTracks.find(t => t.key === "beat");
-  lvNodes.push(...lvWireSplit(lvCtx, lvSource, vocals.gain, beat.gain));
-  vocals.gain.connect(lvCtx.destination);
-  beat.gain.connect(lvCtx.destination);
-}
-
-function lvAudioBufferToWav(buffer) {
-  const numCh = buffer.numberOfChannels;
-  const sr = buffer.sampleRate;
-  const len = buffer.length;
-  const blockAlign = numCh * 2;
-  const dataSize = len * blockAlign;
-  const out = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(out);
-  const writeStr = (offset, s) => { for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i)); };
-
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numCh, true);
-  view.setUint32(24, sr, true);
-  view.setUint32(28, sr * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, "data");
-  view.setUint32(40, dataSize, true);
-
-  const chans = [];
-  for (let c = 0; c < numCh; c++) chans.push(buffer.getChannelData(c));
-  let off = 44;
-  for (let i = 0; i < len; i++) {
-    for (let c = 0; c < numCh; c++) {
-      const s = Math.max(-1, Math.min(1, chans[c][i]));
-      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-      off += 2;
-    }
-  }
-  return new Blob([out], { type: "audio/wav" });
-}
-
-// Kết xuất đúng bản đang nghe — theo đúng % Giọng hát/Nhạc nền đang kéo —
-// thành file WAV rồi tải về. Giải mã lại từ bytes gốc, không đụng tới ctx
-// đang phát để khỏi làm gián đoạn nhạc đang chạy.
-async function lvRenderAndDownload() {
-  if (!lvFileBytes) return;
-  const btn = $("lvDownload");
-  const oldLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Đang tạo file…";
-  try {
-    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const buf = await tmpCtx.decodeAudioData(lvFileBytes.slice(0));
-    tmpCtx.close();
-
-    const off = new OfflineAudioContext(2, Math.ceil(buf.duration * buf.sampleRate), buf.sampleRate);
-    const src = off.createBufferSource();
-    src.buffer = buf;
-
-    const vocalGain = off.createGain();
-    vocalGain.gain.value = lvTracks.find(t => t.key === "vocals").volume;
-    const beatGain = off.createGain();
-    beatGain.gain.value = lvTracks.find(t => t.key === "beat").volume;
-    lvWireSplit(off, src, vocalGain, beatGain);
-    vocalGain.connect(off.destination);
-    beatGain.connect(off.destination);
-
-    src.start(0);
-    const rendered = await off.startRendering();
-    const blob = lvAudioBufferToWav(rendered);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (lvFileBaseName || "tach-nhanh") + ".wav";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  } catch (e) {
-    $("lvErr").textContent = "Không tạo được file để tải: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = oldLabel;
-  }
-}
-
-function lvTeardownGraph() {
-  if (lvSource) { try { lvSource.disconnect(); } catch (e) {} }
-  lvNodes.forEach(n => { try { n.disconnect(); } catch (e) {} });
-  lvNodes = [];
-}
-
-function lvInitMediaEvents() {
-  const media = $("lvVideo");
-  media.addEventListener("play", () => {
-    $("lvPlay").textContent = "❚❚";
-    $("lvPlay").setAttribute("aria-label", "Tạm dừng");
-  });
-  media.addEventListener("pause", () => {
-    $("lvPlay").textContent = "▶";
-    $("lvPlay").setAttribute("aria-label", "Phát");
-  });
-  media.addEventListener("ended", () => {
-    $("lvPlay").textContent = "▶";
-  });
-  media.addEventListener("timeupdate", () => {
-    if (!media.duration) return;
-    $("lvSeek").value = Math.round((media.currentTime / media.duration) * 1000);
-    $("lvTNow").textContent = lvFmt(media.currentTime);
-  });
-}
-
-async function lvLoadFile(file) {
-  $("lvErr").textContent = "";
-  $("lvMixer").style.display = "none";
-  $("lvVideo").style.display = "none";
-  $("lvPicked").textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
-  $("lvLoading").style.display = "flex";
-
-  try {
-    const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name);
-    if (lvObjectUrl) URL.revokeObjectURL(lvObjectUrl);
-    lvObjectUrl = URL.createObjectURL(file);
-    lvFileBytes = await file.arrayBuffer();
-    lvFileBaseName = file.name.replace(/\.[^.]+$/, "");
-
-    // Dùng chung một thẻ <video> cho cả audio lẫn video: tiếng của <video> vẫn
-    // phát đầy đủ dù ẩn khung hình, nên không cần thêm thẻ <audio> riêng —
-    // MediaElementSource chỉ tạo được đúng một lần cho mỗi thẻ media.
-    const media = $("lvVideo");
-    media.muted = false;
-    media.volume = 1;
-    media.src = lvObjectUrl;
-    media.load();
-
-    lvCtx = lvCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (lvCtx.state === "suspended") await lvCtx.resume();
-    if (!lvSource) lvSource = lvCtx.createMediaElementSource(media);
-
-    lvTeardownGraph();
-    lvBuildStrips();
-    lvBuildGraph();
-
-    await new Promise((resolve, reject) => {
-      media.onloadedmetadata = resolve;
-      media.onerror = () => reject(new Error("Không đọc được file này — thử định dạng khác."));
-    });
-
-    media.style.display = isVideo ? "block" : "none";
-    $("lvTEnd").textContent = lvFmt(media.duration);
-    $("lvTNow").textContent = "0:00";
-    $("lvSeek").value = 0;
-    $("lvMixer").style.display = "block";
-    $("lvMixer").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  } finally {
-    $("lvLoading").style.display = "none";
-  }
-}
-
-lvInitMediaEvents();
-
-$("lvPlay").onclick = () => {
-  const media = $("lvVideo");
-  if (!media.src) return;
-  if (lvCtx.state === "suspended") lvCtx.resume();
-  media.paused ? media.play() : media.pause();
-};
-$("lvSeek").oninput = (e) => {
-  const media = $("lvVideo");
-  if (!media.duration) return;
-  media.currentTime = (e.target.value / 1000) * media.duration;
-};
-
-$("lvDownload").onclick = () => { lvRenderAndDownload(); };
 
 $("lvFile").onchange = () => {
   const f = $("lvFile").files[0];
-  if (f) lvLoadFile(f).catch(e => { $("lvErr").textContent = e.message; });
+  if (f) lvForwardToJob(f);
 };
 
 const lvDrop = $("lvDrop");
@@ -1200,8 +861,7 @@ const lvDrop = $("lvDrop");
 }));
 lvDrop.addEventListener("drop", (e) => {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (!f) return;
-  lvLoadFile(f).catch(err => { $("lvErr").textContent = err.message; });
+  if (f) lvForwardToJob(f);
 });
 
 // ---- Kiểm tra backend ----------------------------------------------------
