@@ -7,7 +7,7 @@
 <title>Tách nhạc — tách giọng và nhạc nền khỏi bài hát</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #12101c;
@@ -29,7 +29,7 @@
     margin: 0;
     background: var(--ink);
     color: var(--ivory);
-    font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
     font-size: 15px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -42,16 +42,78 @@
   body::before {
     content: "";
     position: fixed;
-    inset: 0;
+    inset: -6%;
     z-index: 0;
     background:
-      radial-gradient(560px circle at 12% 8%, rgba(255, 92, 122, 0.13), transparent 60%),
-      radial-gradient(620px circle at 88% 18%, rgba(78, 205, 196, 0.11), transparent 60%),
-      radial-gradient(560px circle at 50% 100%, rgba(155, 123, 255, 0.10), transparent 60%);
+      radial-gradient(560px circle at 12% 8%, rgba(255, 92, 122, 0.15), transparent 60%),
+      radial-gradient(620px circle at 88% 18%, rgba(78, 205, 196, 0.13), transparent 60%),
+      radial-gradient(560px circle at 50% 100%, rgba(155, 123, 255, 0.12), transparent 60%);
     pointer-events: none;
+    animation: drift 16s ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-2%, 2%) scale(1.08); }
   }
 
+  /* Vệt waveform trang trí — sinh bằng JS ở cuối trang, thuần trang trí. */
+  .waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 44px;
+    margin: 24px 0 4px;
+  }
+  .waveform span {
+    display: block;
+    width: 3px;
+    min-height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--vocals), var(--bass) 55%, var(--instrumental));
+    animation: wave 1.4s ease-in-out infinite;
+    opacity: 0.8;
+  }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.25); }
+    50% { transform: scaleY(1); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero-in { animation: fadeUp 0.7s cubic-bezier(.2,.7,.3,1) both; }
+
   .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  /* ---- Thanh trên cùng ------------------------------------------------ */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 44px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--ivory);
+  }
+  .badge {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  @media (max-width: 360px) {
+    .badge { display: none; }
+  }
 
   /* ---- Hero ---------------------------------------------------------- */
   .eyebrow {
@@ -70,19 +132,16 @@
   .eyebrow.pro { color: var(--bass); }
 
   h1 {
+    font-family: 'Be Vietnam Pro', system-ui, sans-serif;
     font-size: clamp(34px, 9vw, 56px);
     font-weight: 800;
     line-height: 1.02;
     letter-spacing: -0.03em;
     margin: 0 0 16px;
   }
-  h1 em {
-    font-style: normal;
-    background: linear-gradient(90deg, var(--vocals), var(--bass) 55%, var(--instrumental));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
+  h1 em { font-style: normal; }
+  h1 em.w-vocals { color: var(--vocals); }
+  h1 em.w-instrumental { color: var(--instrumental); }
 
   .lede { color: var(--muted); margin: 0 0 32px; max-width: 46ch; }
 
@@ -94,9 +153,16 @@
     padding: 20px;
     box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6);
     border-top: 1px solid var(--line);
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
   }
-  #liveCard { border-top: 2px solid var(--instrumental); }
-  .card.pro { border-top: 2px solid var(--bass); }
+  #liveCard:hover {
+    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(78, 205, 196, 0.35), 0 20px 50px -20px rgba(78, 205, 196, 0.25);
+    transform: translateY(-2px);
+  }
+  .card.pro:hover {
+    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(155, 123, 255, 0.35), 0 20px 50px -20px rgba(155, 123, 255, 0.25);
+    transform: translateY(-2px);
+  }
 
   label.field {
     display: block;
@@ -131,7 +197,56 @@
 
   .row { margin-bottom: 16px; }
 
+  /* ---- Thẻ so sánh "Kiểu tách" (thay cho select xổ xuống) -------------- */
+  .tier-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+  @media (max-width: 640px) {
+    .tier-grid { grid-template-columns: 1fr; }
+  }
+  .tier {
+    position: relative;
+    text-align: left;
+    cursor: pointer;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font: inherit;
+    color: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .tier:hover { transform: translateY(-2px); }
+  .tier[aria-checked="true"] {
+    border-color: var(--ivory);
+    box-shadow: 0 14px 34px -22px rgba(244, 241, 234, 0.3);
+  }
+  .tier-badge {
+    position: absolute;
+    top: -10px;
+    right: 14px;
+    background: var(--ivory);
+    color: var(--ink);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .tier-title { font-family: 'Be Vietnam Pro', sans-serif; font-weight: 800; font-size: 15px; }
+  .tier-desc { font-size: 12px; line-height: 1.5; color: var(--muted); flex: 1 1 auto; }
+  .tier-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .tier[aria-checked="true"] .tier-time { color: var(--instrumental); }
+
   button.primary {
+    position: relative;
+    overflow: hidden;
     width: 100%;
     background: var(--ivory);
     color: var(--ink);
@@ -145,10 +260,19 @@
     box-shadow: 0 10px 24px -10px rgba(255, 255, 255, 0.18);
     transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
+  button.primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.6s ease;
+  }
   button.primary:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 14px 28px -10px rgba(255, 255, 255, 0.26);
   }
+  button.primary:hover:not(:disabled)::after { transform: translateX(120%); }
   button.primary:active:not(:disabled) { transform: translateY(0); }
   button.primary:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 
@@ -201,32 +325,67 @@
 
   /* Vùng thả file — "thả" theo đúng nghĩa đen, kéo file vào là được. */
   .drop {
-    border: 1px dashed var(--line);
-    border-radius: 11px;
-    padding: 26px 14px 18px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    text-align: left;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    background: var(--ink);
     transition: border-color 0.15s, background 0.15s, transform 0.15s;
   }
   .drop-icon {
-    color: var(--muted);
-    margin-bottom: 10px;
-    transition: color 0.15s, transform 0.15s;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(244, 238, 230, 0.06);
+    color: var(--ivory);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
   }
+  .drop-text { flex: 1 1 200px; min-width: 0; }
+  .drop-title { font-weight: 700; font-size: 14px; color: var(--ivory); }
+  .drop-hint2 { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .drop:hover { transform: translateY(-1px); }
-  .drop:hover .drop-icon { color: var(--ivory); }
   .drop.over {
     border-color: var(--instrumental);
     background: rgba(78, 205, 196, 0.07);
   }
-  .drop.over .drop-icon { color: var(--instrumental); }
-  .drop .picked {
-    font-size: 13px;
-    color: var(--ivory);
-    margin-top: 10px;
+  .drop.over .drop-icon { background: rgba(78, 205, 196, 0.16); color: var(--instrumental); }
+  .picked-inline {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
     word-break: break-all;
   }
-  .drop .picked:empty { display: none; }
-  .drop input[type=file] { margin-top: 10px; }
+  .picked-inline:empty { display: none; }
+  .sr-only-file {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .btn-choose {
+    flex: 0 0 auto;
+    background: var(--ivory);
+    color: var(--ink);
+    border-radius: 9px;
+    padding: 10px 18px;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-choose:hover { opacity: 0.92; }
 
   .hint {
     color: var(--muted);
@@ -520,9 +679,23 @@
 <body>
 <div class="wrap">
 
-  <p class="eyebrow">Tách nguồn âm thanh</p>
-  <h1>Tách <em>giọng</em> khỏi <em>nhạc</em> trong một bước.</h1>
-  <p class="lede">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
+  <div class="topbar">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 32 30" fill="none" aria-hidden="true">
+        <rect x="2" y="14" width="4" height="14" rx="2" fill="var(--vocals)"></rect>
+        <rect x="10" y="6" width="4" height="22" rx="2" fill="var(--drums)"></rect>
+        <rect x="18" y="10" width="4" height="18" rx="2" fill="var(--bass)"></rect>
+        <rect x="26" y="16" width="4" height="12" rx="2" fill="var(--instrumental)"></rect>
+      </svg>
+      <span>TÁCH NHẠC</span>
+    </div>
+    <div class="badge">Không cần tài khoản</div>
+  </div>
+
+  <p class="eyebrow hero-in" style="animation-delay:0s">Tách nguồn âm thanh</p>
+  <h1 class="hero-in" style="animation-delay:0.08s">Tách <em class="w-vocals">giọng</em> khỏi <em class="w-instrumental">nhạc</em> trong một bước.</h1>
+  <p class="lede hero-in" style="animation-delay:0.16s">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
+  <div class="waveform hero-in" id="waveform" style="animation-delay:0.24s" aria-hidden="true"></div>
 
   <div class="banner" id="banner"></div>
 
@@ -539,10 +712,16 @@
     </p>
 
     <div class="drop" id="lvDrop">
-      <svg class="drop-icon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M20.4 18a4.5 4.5 0 0 0-1.9-8.6 5 5 0 0 0-9.5-2.3A5 5 0 0 0 4 15.5"/></svg>
-      <div>Kéo thả file nhạc hoặc video vào đây, hoặc chọn từ máy</div>
-      <input type="file" id="lvFile" accept="audio/*,video/*">
-      <div class="picked" id="lvPicked"></div>
+      <div class="drop-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M20.4 18a4.5 4.5 0 0 0-1.9-8.6 5 5 0 0 0-9.5-2.3A5 5 0 0 0 4 15.5"/></svg>
+      </div>
+      <div class="drop-text">
+        <div class="drop-title">Kéo thả file nhạc hoặc video vào đây</div>
+        <div class="drop-hint2">hoặc chọn từ máy</div>
+        <div class="picked-inline" id="lvPicked"></div>
+      </div>
+      <label class="btn-choose" for="lvFile">Chọn file</label>
+      <input type="file" id="lvFile" accept="audio/*,video/*" class="sr-only-file">
     </div>
     <button class="primary" id="lvGo" type="button" style="display:none; margin-top:14px;">Bắt đầu tách</button>
   </div>
@@ -555,21 +734,28 @@
   </p>
   <div class="card pro">
     <div class="row">
-      <label class="field" for="model">Kiểu tách</label>
-      <select id="model">
+      <label class="field" id="modelLabel">Kiểu tách</label>
+      <select id="model" style="display:none" aria-hidden="true">
         <option value="htdemucs">Nhanh nhất — 4 track: giọng, trống, bass, nhạc cụ</option>
         <option value="roformer">Chất lượng cao nhất — Giọng + Nhạc nền</option>
         <option value="htdemucs_ft">Chi tiết nhất — 4 track, xử lý kỹ hơn</option>
       </select>
+      <div class="tier-grid" id="modelCards" role="radiogroup" aria-labelledby="modelLabel"></div>
     </div>
 
     <div class="source">
       <label class="field" for="file">Cách 1 — thả file từ máy</label>
       <div class="drop" id="drop">
-        <svg class="drop-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M20.4 18a4.5 4.5 0 0 0-1.9-8.6 5 5 0 0 0-9.5-2.3A5 5 0 0 0 4 15.5"/></svg>
-        <div>Kéo thả file vào đây, hoặc chọn từ máy</div>
-        <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.flac">
-        <div class="picked" id="picked"></div>
+        <div class="drop-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M20.4 18a4.5 4.5 0 0 0-1.9-8.6 5 5 0 0 0-9.5-2.3A5 5 0 0 0 4 15.5"/></svg>
+        </div>
+        <div class="drop-text">
+          <div class="drop-title">Kéo thả file vào đây</div>
+          <div class="drop-hint2">hoặc chọn từ máy</div>
+          <div class="picked-inline" id="picked"></div>
+        </div>
+        <label class="btn-choose" for="file">Chọn file</label>
+        <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.flac" class="sr-only-file">
       </div>
       <p class="hint">MP3, WAV, M4A, FLAC… tối đa 60 MB.</p>
       <button class="primary" id="goFile">Tách file này</button>
@@ -682,6 +868,48 @@ const LABELS = {
 };
 const labelOf = (n) => LABELS[String(n).toLowerCase()] || n;
 const colorOf = (n) => COLORS[String(n).toLowerCase()] || "var(--other)";
+
+// ---- Thẻ "Kiểu tách" ------------------------------------------------------
+// Tên/tốc độ thân thiện cho các model đã biết — backend trả nhãn kỹ thuật
+// (vd. "HTDemucs FT (4 stem)"), model lạ trong tương lai thì rơi về nhãn đó.
+const MODEL_INFO = {
+  htdemucs: { title: "Nhanh nhất", time: "~30–60 giây" },
+  roformer: { title: "Chất lượng cao nhất", time: "~30–60 giây" },
+  htdemucs_ft: { title: "Chi tiết nhất", time: "~2–4 phút" },
+};
+
+function selectModel(value) {
+  $("model").value = value;
+  [...$("modelCards").children].forEach(el => {
+    el.setAttribute("aria-checked", String(el.dataset.value === value));
+  });
+}
+
+function renderModelCards() {
+  const sel = $("model");
+  const box = $("modelCards");
+  box.innerHTML = "";
+  [...sel.options].forEach((opt, i) => {
+    const info = MODEL_INFO[opt.value];
+    const [fallbackTitle, fallbackDesc] = opt.textContent.split(" — ");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tier";
+    btn.dataset.value = opt.value;
+    btn.setAttribute("role", "radio");
+    btn.setAttribute("aria-checked", String(opt.value === sel.value));
+    btn.innerHTML =
+      (i === 0 ? `<span class="tier-badge">Mặc định</span>` : "") +
+      `<span class="tier-title"></span>` +
+      `<span class="tier-desc"></span>` +
+      `<span class="tier-time"></span>`;
+    btn.querySelector(".tier-title").textContent = (info && info.title) || fallbackTitle || opt.textContent;
+    btn.querySelector(".tier-desc").textContent = fallbackDesc || "";
+    btn.querySelector(".tier-time").textContent = (info && info.time) || "";
+    btn.onclick = () => selectModel(opt.value);
+    box.appendChild(btn);
+  });
+}
 
 // ---- Audio engine --------------------------------------------------------
 let ctx, tracks = [], duration = 0, playing = false, startedAt = 0, offset = 0, raf;
@@ -916,7 +1144,7 @@ function lvStageFile(file) {
   $("file").files = dt.files;
   showPicked();
   $("lvPicked").textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
-  $("model").value = "htdemucs";
+  selectModel("htdemucs");
   $("err").textContent = "";
   $("lvGo").style.display = "block";
 }
@@ -994,11 +1222,14 @@ async function checkBackend() {
     Object.entries(models).forEach(([key, m]) => {
       const opt = document.createElement("option");
       opt.value = key;
-      opt.textContent = `${m.label} — ${(m.stems || []).map(labelOf).join(", ")}`;
+      const title = (MODEL_INFO[key] && MODEL_INFO[key].title) || m.label;
+      const desc = (m.stems || []).map(labelOf).join(", ");
+      opt.textContent = desc ? `${title} — ${desc}` : title;
       sel.appendChild(opt);
     });
     if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
   } catch (e) { /* giữ nguyên danh sách tĩnh trong HTML */ }
+  renderModelCards();
 
   // Backend cũ chưa có /jobs/link. Chỉ dán một lời nhắc lên ô link — không khoá
   // nút, không chuyển hộ người dùng sang cách khác. Bản trước tự nhảy sang phần
@@ -1369,7 +1600,25 @@ async function resumeJob() {
   }
 }
 
+renderModelCards();
 checkBackend().then(ok => { if (ok) resumeJob(); });
+
+// ---- Waveform trang trí ở hero — thuần thẩm mỹ, không liên quan tách nhạc.
+(() => {
+  const box = $("waveform");
+  if (!box) return;
+  const n = 28;
+  for (let i = 0; i < n; i++) {
+    const bar = document.createElement("span");
+    const dur = (0.9 + Math.random() * 0.9).toFixed(2);
+    const delay = (Math.random() * -1.6).toFixed(2);
+    const h = Math.round(14 + Math.random() * 30);
+    bar.style.height = h + "px";
+    bar.style.animationDuration = dur + "s";
+    bar.style.animationDelay = delay + "s";
+    box.appendChild(bar);
+  }
+})();
 </script>
 </body>
 </html>
