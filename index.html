@@ -34,12 +34,30 @@
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     padding: 0 0 env(safe-area-inset-bottom);
+    position: relative;
   }
 
-  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+  /* Nền trang trí — vài quầng màu mờ, cố định theo viewport, không cuộn theo
+     nội dung. Chỉ để đỡ trống trên màn hình rộng, không ảnh hưởng bố cục. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(560px circle at 12% 8%, rgba(255, 92, 122, 0.13), transparent 60%),
+      radial-gradient(620px circle at 88% 18%, rgba(78, 205, 196, 0.11), transparent 60%),
+      radial-gradient(560px circle at 50% 100%, rgba(155, 123, 255, 0.10), transparent 60%);
+    pointer-events: none;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
 
   /* ---- Hero ---------------------------------------------------------- */
   .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     letter-spacing: 0.18em;
@@ -47,6 +65,9 @@
     color: var(--muted);
     margin: 0 0 14px;
   }
+  .eyebrow svg { flex: 0 0 auto; }
+  .eyebrow.fast { color: var(--instrumental); }
+  .eyebrow.pro { color: var(--bass); }
 
   h1 {
     font-size: clamp(34px, 9vw, 56px);
@@ -71,7 +92,11 @@
     border: 1px solid var(--line);
     border-radius: 14px;
     padding: 20px;
+    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6);
+    border-top: 1px solid var(--line);
   }
+  #liveCard { border-top: 2px solid var(--instrumental); }
+  .card.pro { border-top: 2px solid var(--bass); }
 
   label.field {
     display: block;
@@ -117,8 +142,15 @@
     font-weight: 800;
     font-size: 15px;
     cursor: pointer;
+    box-shadow: 0 10px 24px -10px rgba(255, 255, 255, 0.18);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
-  button.primary:disabled { opacity: 0.4; cursor: default; }
+  button.primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px -10px rgba(255, 255, 255, 0.26);
+  }
+  button.primary:active:not(:disabled) { transform: translateY(0); }
+  button.primary:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 
   /* ---- Hai nguồn nhạc, cùng hiện trên một trang ------------------------ */
   /* Cố tình KHÔNG dùng tab: tab nào cũng phải chọn sẵn một cái, mà chọn sẵn
@@ -171,14 +203,22 @@
   .drop {
     border: 1px dashed var(--line);
     border-radius: 11px;
-    padding: 18px 14px;
+    padding: 26px 14px 18px;
     text-align: center;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
   }
+  .drop-icon {
+    color: var(--muted);
+    margin-bottom: 10px;
+    transition: color 0.15s, transform 0.15s;
+  }
+  .drop:hover { transform: translateY(-1px); }
+  .drop:hover .drop-icon { color: var(--ivory); }
   .drop.over {
     border-color: var(--instrumental);
     background: rgba(78, 205, 196, 0.07);
   }
+  .drop.over .drop-icon { color: var(--instrumental); }
   .drop .picked {
     font-size: 13px;
     color: var(--ivory);
@@ -484,7 +524,12 @@
   <h1>Tách <em>giọng</em> khỏi <em>nhạc</em> trong một bước.</h1>
   <p class="lede">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
 
-  <p class="eyebrow">Tách nhanh — AI thật, không phải mẹo giả lập</p>
+  <div class="banner" id="banner"></div>
+
+  <p class="eyebrow fast">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    Tách nhanh — AI thật, không phải mẹo giả lập
+  </p>
   <div class="card" id="liveCard">
     <p class="lede" style="margin-bottom:20px; max-width: none;">
       Thả file nhạc hoặc video vào đây là chạy luôn — dùng đúng model AI nhanh
@@ -495,7 +540,8 @@
     </p>
 
     <div class="drop" id="lvDrop">
-      Kéo thả file nhạc hoặc video vào đây, hoặc chọn từ máy
+      <svg class="drop-icon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M20.4 18a4.5 4.5 0 0 0-1.9-8.6 5 5 0 0 0-9.5-2.3A5 5 0 0 0 4 15.5"/></svg>
+      <div>Kéo thả file nhạc hoặc video vào đây, hoặc chọn từ máy</div>
       <input type="file" id="lvFile" accept="audio/*,video/*">
       <div class="picked" id="lvPicked"></div>
     </div>
@@ -503,9 +549,11 @@
 
   <div class="orbar"><span>hoặc tuỳ chỉnh model / dán link</span></div>
 
-  <div class="banner" id="banner"></div>
-
-  <div class="card">
+  <p class="eyebrow pro">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    Tuỳ chỉnh — chọn model, dán link
+  </p>
+  <div class="card pro">
     <div class="row">
       <label class="field" for="model">Kiểu tách</label>
       <select id="model">
@@ -518,7 +566,8 @@
     <div class="source">
       <label class="field" for="file">Cách 1 — thả file từ máy</label>
       <div class="drop" id="drop">
-        Kéo thả file vào đây, hoặc chọn từ máy
+        <svg class="drop-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M20.4 18a4.5 4.5 0 0 0-1.9-8.6 5 5 0 0 0-9.5-2.3A5 5 0 0 0 4 15.5"/></svg>
+        <div>Kéo thả file vào đây, hoặc chọn từ máy</div>
         <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.flac">
         <div class="picked" id="picked"></div>
       </div>
