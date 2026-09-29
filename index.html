@@ -42,14 +42,48 @@
   body::before {
     content: "";
     position: fixed;
-    inset: 0;
+    inset: -6%;
     z-index: 0;
     background:
-      radial-gradient(560px circle at 12% 8%, rgba(255, 92, 122, 0.13), transparent 60%),
-      radial-gradient(620px circle at 88% 18%, rgba(78, 205, 196, 0.11), transparent 60%),
-      radial-gradient(560px circle at 50% 100%, rgba(155, 123, 255, 0.10), transparent 60%);
+      radial-gradient(560px circle at 12% 8%, rgba(255, 92, 122, 0.15), transparent 60%),
+      radial-gradient(620px circle at 88% 18%, rgba(78, 205, 196, 0.13), transparent 60%),
+      radial-gradient(560px circle at 50% 100%, rgba(155, 123, 255, 0.12), transparent 60%);
     pointer-events: none;
+    animation: drift 16s ease-in-out infinite alternate;
   }
+  @keyframes drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-2%, 2%) scale(1.08); }
+  }
+
+  /* Vệt waveform trang trí — sinh bằng JS ở cuối trang, thuần trang trí. */
+  .waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 44px;
+    margin: 24px 0 4px;
+  }
+  .waveform span {
+    display: block;
+    width: 3px;
+    min-height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--vocals), var(--bass) 55%, var(--instrumental));
+    animation: wave 1.4s ease-in-out infinite;
+    opacity: 0.8;
+  }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.25); }
+    50% { transform: scaleY(1); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero-in { animation: fadeUp 0.7s cubic-bezier(.2,.7,.3,1) both; }
 
   .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
 
@@ -78,10 +112,15 @@
   }
   h1 em {
     font-style: normal;
-    background: linear-gradient(90deg, var(--vocals), var(--bass) 55%, var(--instrumental));
+    background: linear-gradient(90deg, var(--vocals), var(--bass) 45%, var(--instrumental), var(--vocals));
+    background-size: 250% auto;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    animation: shine 5s linear infinite;
+  }
+  @keyframes shine {
+    to { background-position: -250% center; }
   }
 
   .lede { color: var(--muted); margin: 0 0 32px; max-width: 46ch; }
@@ -94,9 +133,18 @@
     padding: 20px;
     box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6);
     border-top: 1px solid var(--line);
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
   }
   #liveCard { border-top: 2px solid var(--instrumental); }
   .card.pro { border-top: 2px solid var(--bass); }
+  #liveCard:hover {
+    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(78, 205, 196, 0.35), 0 20px 50px -20px rgba(78, 205, 196, 0.25);
+    transform: translateY(-2px);
+  }
+  .card.pro:hover {
+    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(155, 123, 255, 0.35), 0 20px 50px -20px rgba(155, 123, 255, 0.25);
+    transform: translateY(-2px);
+  }
 
   label.field {
     display: block;
@@ -132,6 +180,8 @@
   .row { margin-bottom: 16px; }
 
   button.primary {
+    position: relative;
+    overflow: hidden;
     width: 100%;
     background: var(--ivory);
     color: var(--ink);
@@ -145,10 +195,19 @@
     box-shadow: 0 10px 24px -10px rgba(255, 255, 255, 0.18);
     transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
+  button.primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.6s ease;
+  }
   button.primary:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 14px 28px -10px rgba(255, 255, 255, 0.26);
   }
+  button.primary:hover:not(:disabled)::after { transform: translateX(120%); }
   button.primary:active:not(:disabled) { transform: translateY(0); }
   button.primary:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 
@@ -520,9 +579,10 @@
 <body>
 <div class="wrap">
 
-  <p class="eyebrow">Tách nguồn âm thanh</p>
-  <h1>Tách <em>giọng</em> khỏi <em>nhạc</em> trong một bước.</h1>
-  <p class="lede">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
+  <p class="eyebrow hero-in" style="animation-delay:0s">Tách nguồn âm thanh</p>
+  <h1 class="hero-in" style="animation-delay:0.08s">Tách <em>giọng</em> khỏi <em>nhạc</em> trong một bước.</h1>
+  <p class="lede hero-in" style="animation-delay:0.16s">Dán link YouTube/Spotify hoặc thả file bài hát vào, nhận về từng track riêng biệt — giọng, trống, bass, nhạc cụ. Nghe thử trực tiếp rồi tải về track bạn cần.</p>
+  <div class="waveform hero-in" id="waveform" style="animation-delay:0.24s" aria-hidden="true"></div>
 
   <div class="banner" id="banner"></div>
 
@@ -1370,6 +1430,23 @@ async function resumeJob() {
 }
 
 checkBackend().then(ok => { if (ok) resumeJob(); });
+
+// ---- Waveform trang trí ở hero — thuần thẩm mỹ, không liên quan tách nhạc.
+(() => {
+  const box = $("waveform");
+  if (!box) return;
+  const n = 28;
+  for (let i = 0; i < n; i++) {
+    const bar = document.createElement("span");
+    const dur = (0.9 + Math.random() * 0.9).toFixed(2);
+    const delay = (Math.random() * -1.6).toFixed(2);
+    const h = Math.round(14 + Math.random() * 30);
+    bar.style.height = h + "px";
+    bar.style.animationDuration = dur + "s";
+    bar.style.animationDelay = delay + "s";
+    box.appendChild(bar);
+  }
+})();
 </script>
 </body>
 </html>
