@@ -122,22 +122,32 @@ JOB_TTL_SECONDS = 24 * 3600
 
 # Phần mở rộng được phép. Giữ lại đuôi file là bắt buộc: audio-separator dựa vào
 # nó để chọn decoder, file tên "input" trần không mở được với m4a/aac/flac.
-ALLOWED_EXTS = {".mp3", ".wav", ".m4a", ".mp4", ".flac", ".ogg", ".opus", ".aac", ".wma"}
+# Có cả đuôi video (mp4/mov/webm/mkv/avi) vì ffmpeg tách audio từ video được
+# bình thường, và frontend hiện lại video đó trong lúc chỉnh mixer.
+ALLOWED_EXTS = {
+    ".mp3", ".wav", ".m4a", ".mp4", ".flac", ".ogg", ".opus", ".aac", ".wma",
+    ".mov", ".webm", ".mkv", ".avi",
+}
 DEFAULT_EXT = ".mp3"
 
 # Stem luôn ra MP3, nhưng bản gốc thì giữ nguyên định dạng người dùng đưa vào —
 # trả nhầm "audio/mpeg" cho một file flac là nói dối trình duyệt, có máy sẽ mở
-# trong trình phát rồi phát lỗi thay vì lưu về.
+# trong trình phát rồi phát lỗi thay vì lưu về. mp4/mov/webm/mkv/avi khai đúng
+# video/* để trình duyệt phát được ngay trong thẻ <video>, không chỉ để tải về.
 MEDIA_TYPES = {
     ".mp3": "audio/mpeg",
     ".wav": "audio/wav",
     ".m4a": "audio/mp4",
-    ".mp4": "audio/mp4",
+    ".mp4": "video/mp4",
     ".flac": "audio/flac",
     ".ogg": "audio/ogg",
     ".opus": "audio/opus",
     ".aac": "audio/aac",
     ".wma": "audio/x-ms-wma",
+    ".mov": "video/quicktime",
+    ".webm": "video/webm",
+    ".mkv": "video/x-matroska",
+    ".avi": "video/x-msvideo",
 }
 
 
