@@ -811,7 +811,7 @@ function showSourceRow(jobId, job) {
 
   // Video thì hiện lại để xem trong lúc chỉnh mixer — tiếng thật lấy từ các
   // track đã tách qua Web Audio, nên video này luôn câm (muted), chỉ để nhìn.
-  if (/^(mp4|mov|webm|mkv|avi)$/i.test(job.source_ext)) {
+  if (/^\.?(mp4|mov|webm|mkv|avi)$/i.test(job.source_ext)) {
     video.src = srcUrl;
     video.style.display = "block";
   } else {
