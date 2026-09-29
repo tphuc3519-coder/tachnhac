@@ -216,7 +216,7 @@
   /* Xem/nghe lại file gốc trong lúc chờ máy chủ tách — đỡ nhìn thanh
      progress trống trơn. Chỉ có với Cách 1 (thả file), vì Cách 2 (link)
      chưa có file nào ở máy để phát. */
-  #previewVideo {
+  #previewVideo, #mixerVideo {
     display: none;
     width: 100%;
     height: min(52vh, 380px);
@@ -573,6 +573,7 @@
   </div>
 
   <div id="mixer">
+    <video id="mixerVideo" muted playsinline></video>
     <div class="transport">
       <button class="playbtn" id="play" aria-label="Phát">▶</button>
       <div class="scrub">
@@ -687,6 +688,11 @@ function play() {
   playing = true;
   $("play").textContent = "❚❚";
   $("play").setAttribute("aria-label", "Tạm dừng");
+  const video = $("mixerVideo");
+  if (video.style.display !== "none") {
+    video.currentTime = offset;
+    video.play().catch(() => {});
+  }
   tick();
 }
 
@@ -698,6 +704,7 @@ function pause(keepPos = true) {
   $("play").setAttribute("aria-label", "Phát");
   cancelAnimationFrame(raf);
   drawMeters(true);
+  $("mixerVideo").pause();
 }
 
 function position() {
@@ -722,7 +729,7 @@ function drawMeters(zero = false) {
 
 function tick() {
   const p = position();
-  if (p >= duration) { pause(false); offset = 0; $("seek").value = 0; $("tNow").textContent = "0:00"; return; }
+  if (p >= duration) { pause(false); offset = 0; $("seek").value = 0; $("tNow").textContent = "0:00"; $("mixerVideo").currentTime = 0; return; }
   $("seek").value = Math.round((p / duration) * 1000);
   $("tNow").textContent = fmt(p);
   drawMeters();
@@ -786,14 +793,31 @@ function buildMixer(jobId, stems) {
 // bản này — không có source_ext, khi đó nút bấm vào chỉ ăn 404.
 function showSourceRow(jobId, job) {
   const row = $("srcRow");
-  if (!job || !job.source_ext) { row.style.display = "none"; return; }
+  const video = $("mixerVideo");
+  if (!job || !job.source_ext) {
+    row.style.display = "none";
+    video.style.display = "none";
+    video.removeAttribute("src");
+    return;
+  }
 
-  $("srcDl").href = `${API}/jobs/${encodeURIComponent(jobId)}/source`;
+  const srcUrl = `${API}/jobs/${encodeURIComponent(jobId)}/source`;
+  $("srcDl").href = srcUrl;
   const name = (job.filename || "").trim();
   $("srcRowNote").textContent = name
     ? `${name} — cả bài, chưa tách`
     : "Cả bài, chưa tách — vocal + nhạc nền";
   row.style.display = "flex";
+
+  // Video thì hiện lại để xem trong lúc chỉnh mixer — tiếng thật lấy từ các
+  // track đã tách qua Web Audio, nên video này luôn câm (muted), chỉ để nhìn.
+  if (/^(mp4|mov|webm|mkv|avi)$/i.test(job.source_ext)) {
+    video.src = srcUrl;
+    video.style.display = "block";
+  } else {
+    video.style.display = "none";
+    video.removeAttribute("src");
+  }
 }
 
 async function loadStems(jobId, job) {
@@ -829,6 +853,7 @@ $("seek").oninput = (e) => {
   offset = (e.target.value / 1000) * duration;
   $("tNow").textContent = fmt(offset);
   if (wasPlaying) play();
+  else $("mixerVideo").currentTime = offset;
 };
 
 // ---- Ô "Tách nhanh" ở đầu trang: chỉ là lối tắt --------------------------
