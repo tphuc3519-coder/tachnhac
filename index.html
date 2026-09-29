@@ -532,11 +532,10 @@
   </p>
   <div class="card" id="liveCard">
     <p class="lede" style="margin-bottom:20px; max-width: none;">
-      Thả file nhạc hoặc video vào đây là chạy luôn — dùng đúng model AI nhanh
-      nhất (tách được <b>giọng, trống, bass, nhạc cụ khác</b> kể cả sáo), không
-      phải mẹo triệt pha nên tách sạch thật sự. Chờ khoảng 30-60 giây, có thể
-      xem lại video trong lúc chờ. Cần chọn model khác hoặc dán link thì dùng
-      phần bên dưới.
+      Thả file nhạc hoặc video vào đây — AI tách ngay thành
+      <b>giọng hát, trống, bass và nhạc cụ khác</b>, kể cả sáo. Chờ khoảng
+      30-60 giây, xem lại video ngay trong lúc chờ. Cần chọn kiểu tách khác
+      hoặc dán link thì dùng phần bên dưới.
     </p>
 
     <div class="drop" id="lvDrop">
@@ -545,6 +544,7 @@
       <input type="file" id="lvFile" accept="audio/*,video/*">
       <div class="picked" id="lvPicked"></div>
     </div>
+    <button class="primary" id="lvGo" type="button" style="display:none; margin-top:14px;">Bắt đầu tách</button>
   </div>
 
   <div class="orbar"><span>hoặc tuỳ chỉnh model / dán link</span></div>
@@ -557,9 +557,9 @@
     <div class="row">
       <label class="field" for="model">Kiểu tách</label>
       <select id="model">
-        <option value="htdemucs">4 track: giọng, trống, bass, nhạc cụ — nhanh nhất</option>
-        <option value="roformer">Giọng + Nhạc nền — tách kĩ, chất lượng cao nhất</option>
-        <option value="htdemucs_ft">4 track — tách kĩ hơn, chậm hơn ~4x</option>
+        <option value="htdemucs">Nhanh nhất — 4 track: giọng, trống, bass, nhạc cụ</option>
+        <option value="roformer">Chất lượng cao nhất — Giọng + Nhạc nền</option>
+        <option value="htdemucs_ft">Chi tiết nhất — 4 track, xử lý kỹ hơn</option>
       </select>
     </div>
 
@@ -595,11 +595,11 @@
     <div class="err" id="err"></div>
 
     <details class="setup" id="setup">
-      <summary>Cấu hình backend</summary>
+      <summary>Cấu hình nâng cao</summary>
       <p class="hint">
-        Trang đã có sẵn URL backend, bình thường không cần đụng tới đây.
-        Ô này để trỏ sang một backend Modal khác khi cần thử nghiệm — URL chỉ lưu
-        trong trình duyệt này. Để trống rồi bấm Lưu là quay về mặc định.
+        Trang đã tự kết nối máy chủ xử lý sẵn, bình thường không cần đụng tới
+        đây. Ô này để trỏ sang một máy chủ khác khi cần — chỉ lưu trong trình
+        duyệt này. Để trống rồi bấm Lưu là quay về mặc định.
       </p>
       <div class="apirow">
         <input type="url" id="apiUrl" placeholder="https://…--tachnhac-api.modal.run"
@@ -907,21 +907,25 @@ $("seek").oninput = (e) => {
 
 // ---- Ô "Tách nhanh" ở đầu trang: chỉ là lối tắt --------------------------
 // Không tự xử lý gì cả — nhét file vào đúng input của Cách 1, ép model nhanh
-// nhất rồi gọi thẳng startJob, để dùng chung một đường xử lý (upload, poll,
-// mixer) với phần bên dưới thay vì viết riêng một bộ máy khác.
-function lvForwardToJob(file) {
+// nhất, để dùng chung một đường xử lý (upload, poll, mixer) với phần bên
+// dưới thay vì viết riêng một bộ máy khác. Chờ bấm "Bắt đầu tách" mới thật
+// sự gửi lên máy chủ — thả nhầm file hay đổi ý thì chưa tốn gì cả.
+function lvStageFile(file) {
   const dt = new DataTransfer();
   dt.items.add(file);
   $("file").files = dt.files;
   showPicked();
+  $("lvPicked").textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MB`;
   $("model").value = "htdemucs";
   $("err").textContent = "";
-  startJob("file");
+  $("lvGo").style.display = "block";
 }
+
+$("lvGo").onclick = () => startJob("file");
 
 $("lvFile").onchange = () => {
   const f = $("lvFile").files[0];
-  if (f) lvForwardToJob(f);
+  if (f) lvStageFile(f);
 };
 
 const lvDrop = $("lvDrop");
@@ -935,7 +939,7 @@ const lvDrop = $("lvDrop");
 }));
 lvDrop.addEventListener("drop", (e) => {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (f) lvForwardToJob(f);
+  if (f) lvStageFile(f);
 });
 
 // ---- Kiểm tra backend ----------------------------------------------------
@@ -965,20 +969,19 @@ async function checkBackend() {
     res = await fetch(url, { cache: "no-store" });
   } catch (e) {
     return failBackend(
-      "<b>Chưa kết nối được backend.</b>" +
-      `Không gọi được <code>${url}</code>. ` +
-      "Có thể app Modal chưa chạy, hoặc mạng đang chặn."
+      "<b>Không kết nối được máy chủ xử lý.</b>" +
+      "Máy chủ có thể đang khởi động lại hoặc mạng đang chặn kết nối. " +
+      "Thử tải lại trang sau ít phút."
     );
   }
 
   if (!res.ok) {
     return failBackend(
-      `<b>Backend trả về lỗi HTTP ${res.status}.</b>` +
-      `Đã gọi <code>${url}</code>. ` +
+      "<b>Máy chủ xử lý đang gặp sự cố.</b>" +
       (res.status === 404
-        ? "Địa chỉ này không có endpoint <code>/models</code> — nhiều khả năng URL backend sai. " +
+        ? "Địa chỉ máy chủ trong cấu hình có thể không đúng. " +
           "Xoá ô bên dưới rồi bấm Lưu để quay về mặc định."
-        : "Xem log của app Modal.")
+        : "Vui lòng thử lại sau ít phút.")
     );
   }
 
@@ -1014,9 +1017,8 @@ async function checkBackend() {
     }
   } catch (e) {
     $("linkNote").innerHTML =
-      "<b>Backend đang chạy bản cũ, chưa nhận link.</b>" +
-      "Vào GitHub → tab <b>Actions</b> → <b>Deploy Modal</b> → <b>Run workflow</b>, " +
-      "chờ build xong rồi tải lại trang. Trong lúc đó vẫn tách được bằng Cách 1.";
+      "<b>Tính năng dán link hiện chưa khả dụng.</b>" +
+      "Vui lòng dùng Cách 1 (thả file) trong lúc chờ cập nhật.";
     $("linkNote").style.display = "block";
   }
 
@@ -1039,7 +1041,7 @@ $("apiSave").onclick = () => {
 // ---- Hai nguồn nhạc -------------------------------------------------------
 // Không còn khái niệm "tab đang chọn": mỗi nguồn có nút riêng, bấm nút nào thì
 // chạy nguồn đó. Nhờ vậy trang không bao giờ phải tự chuyển qua lại.
-const BUTTONS = ["goFile", "goLink"];
+const BUTTONS = ["goFile", "goLink", "lvGo"];
 
 function setBusy(on) {
   BUTTONS.forEach(id => { $(id).disabled = on; });
@@ -1112,7 +1114,7 @@ function uploadJob(fd, onProgress) {
         reject(new Error(
           "Máy chủ từ chối vì file quá lớn (HTTP 413).\n" +
           (API === "/api"
-            ? "Đường vòng qua Vercel giới hạn dung lượng upload. Dán thẳng URL Modal ở mục Cấu hình backend để gửi trực tiếp."
+            ? "Đường tải lên hiện giới hạn dung lượng — dùng địa chỉ máy chủ trực tiếp trong mục Cấu hình để gửi thẳng."
             : "Giảm dung lượng file xuống dưới 60 MB.")
         ));
       } else {
@@ -1123,7 +1125,7 @@ function uploadJob(fd, onProgress) {
       }
     };
     xhr.onerror = () => reject(new Error(
-      "Không gửi được file lên backend. Kiểm tra kết nối mạng và URL backend."
+      "Không gửi được file lên máy chủ. Kiểm tra lại kết nối mạng."
     ));
     xhr.ontimeout = () => reject(new Error("Tải lên quá lâu, đã huỷ."));
     xhr.timeout = 10 * 60 * 1000;
@@ -1141,7 +1143,7 @@ async function submitLink(url, model) {
       body: JSON.stringify({ url, model })
     });
   } catch (e) {
-    throw new Error("Không gửi được link lên backend. Kiểm tra kết nối mạng.");
+    throw new Error("Không gửi được link lên máy chủ. Kiểm tra kết nối mạng.");
   }
 
   let body = null;
@@ -1149,13 +1151,13 @@ async function submitLink(url, model) {
 
   if (res.status === 404) {
     throw new Error(
-      "Backend chưa có chức năng tải từ link.\n" +
-      "Deploy lại app Modal (Actions → Deploy Modal) rồi thử lại."
+      "Máy chủ chưa hỗ trợ tải từ link.\n" +
+      "Vui lòng dùng Cách 1 (thả file) hoặc thử lại sau."
     );
   }
   if (!res.ok || !body || !body.job_id) {
     const d = body && body.detail;
-    throw new Error(typeof d === "string" ? d : `Backend từ chối link (HTTP ${res.status}).`);
+    throw new Error(typeof d === "string" ? d : `Máy chủ từ chối link (HTTP ${res.status}).`);
   }
   return body;
 }
@@ -1236,16 +1238,15 @@ async function pollUntilDone(job_id, t0) {
     if (job.status === "queued" && !queuedAt) queuedAt = Date.now();
     if (job.status === "queued" && queuedAt && Date.now() - queuedAt > 4 * 60 * 1000) {
       throw new Error(
-        "Job nằm ở hàng đợi hơn 4 phút mà container GPU chưa khởi động.\n" +
-        `Thường là Modal chưa cấp phát được GPU. Mở ${API}/diag để kiểm tra.`
+        "Yêu cầu xử lý đang chờ quá lâu (hơn 4 phút) mà chưa bắt đầu.\n" +
+        "Máy chủ có thể đang quá tải, vui lòng thử lại sau."
       );
     }
 
     if (Date.now() > deadline) {
       throw new Error(
-        `Trang đã chờ 20 phút, job vẫn ở trạng thái "${job.status}"` +
-        (job.device ? ` trên ${job.device}` : "") + ".\n" +
-        "Job vẫn đang chạy tiếp ở Modal — tải lại trang sau ít phút để lấy kết quả."
+        "Trang đã chờ 20 phút mà chưa có kết quả.\n" +
+        "Quá trình xử lý vẫn tiếp tục phía máy chủ — tải lại trang sau ít phút để lấy kết quả."
       );
     }
 
